@@ -50,7 +50,7 @@ district_keys %>%
 
 dist_phases %>% 
   left_join(district_keys, by = c('state_name' = 'ec05_state_name', 'district_name' = 'ec05_district_name')) %>% 
-  filter(is.na(ec05_state_id)) 
+  filter(is.na(ec05_state_id)) %>% View('dists')
 
 district_keys_2 %>% 
   left_join(dist_phases, by = c('ec13_state_name' = 'state_name', 'ec13_district_name' = 'district_name')) %>% 
@@ -104,6 +104,7 @@ main_data  <- main_data %>%
     treat_lead_2 = treatment_dummy_shift(phase, year, -2),
     treat_lead_3 = treatment_dummy_shift(phase, year, -3),
     treat_lead_4 = treatment_dummy_shift(phase, year, -4),
+    treat_lead_5 = treatment_dummy_shift(phase, year, -5),
     treat_lag_1 = treatment_dummy_shift(phase, year, 1)
     )
 
@@ -142,7 +143,30 @@ dynamic_spec <- feols(log_total_forest ~ treat_dummy + treat_lead_1 + treat_lead
 
 
 test_pretrends_spec <- feols(log_total_forest ~ treat_lead_1 + treat_lead_2
-                      + treat_lead_3|state_district + year_factor, main_data %>% filter(treatment == 0))
+                      + treat_lead_3 + treat_lead_4|state_district + year_factor, main_data %>% filter(treatment == 0))
+
+
+fitstat(test_pretrends_spec,
+        ~ f)
+
+
+test_pretrends_spec$ssr_null
+test_pretrends_spec$ssr_fe_only
+test_pretrends_spec$sigma2
+
+1- sum(test_pretrends_spec$residuals^2)/test_pretrends_spec$ssr_null 
+
+r_sq <- 1- ( sum(test_pretrends_spec$residuals^2))/test_pretrends_spec$ssr_fe_only 
+
+N <- test_pretrends_spec$nobs
+N <- 620
+p <- test_pretrends_spec$nparams - sum(test_pretrends_spec$fixef_sizes)
+
+F_stat <- (N-p)/(p-1) * 1/(1-r_sq)
+
+pf(F_stat, df1 = N, df2 = p)
+pf(F_stat, df2 = N, df1 = p)
+
 
 
 # cluster FE by organization
