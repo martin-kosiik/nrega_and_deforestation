@@ -104,8 +104,12 @@ main_data  <- main_data %>%
     treat_lead_3 = treatment_dummy_shift(phase, year, -3),
     treat_lead_4 = treatment_dummy_shift(phase, year, -4),
     treat_lead_5 = treatment_dummy_shift(phase, year, -5),
+    treat_lead_6 = treatment_dummy_shift(phase, year, -6),
     treat_lag_1 = treatment_dummy_shift(phase, year, 1)
     )
+
+
+
 
 #main_data  <- main_data %>% 
   #group_by(shrid, year) %>% 
@@ -133,8 +137,15 @@ library(fixest)
 
 basic_spec <- feols(log_total_forest ~ treatment|shrid + year_factor, cluster = ~state_district, main_data)
 
+village_spec_time_trends <- feols(log_total_forest ~ treatment|shrid + year_factor + shrid[year], cluster = ~state_district, main_data)
+
+
 avg_forest_spec <- feols(avg_forest ~ treatment|shrid + year_factor, cluster = ~state_district, main_data)
 
+main_effect_two_way_clust <- 
+
+  
+  
 basic_spec <- feols(log_total_forest ~ treatment|shrid + year_factor, cluster = ~state_district,
                     main_data %>% filter(year <= 2008))
 
@@ -145,14 +156,25 @@ dynamic_spec <- feols(log_total_forest ~ treat_dummy + treat_lead_1 + treat_lead
 
 
 
-test_pretrends_spec <- feols(log_total_forest ~ treat_lead_1 + treat_lead_2
+
+
+# Pre-trends
+test_pretrends_spec_2 <- feols(log_total_forest ~ treat_lead_1 + treat_lead_2
                       + treat_lead_3 + treat_lead_4 + treat_lead_5|shrid + year_factor,
                       cluster = ~state_district, main_data %>% filter(treatment == 0))
 
-test_pretrends_spec_2 <- feols(log_total_forest ~ treat_lead_1 + treat_lead_2
+test_pretrends_spec_3 <- feols(log_total_forest ~ treat_lead_1 + treat_lead_2
                              + treat_lead_3 + treat_lead_4|shrid + year_factor,
                              cluster = ~state_district, main_data %>% filter(treatment == 0))
 
+test_pretrends_spec <- feols(log_total_forest ~ treat_lead_1 + treat_lead_2
+                               + treat_lead_3 + treat_lead_4 + treat_lead_5 + treat_lead_6|shrid + year_factor,
+                               cluster = ~state_district, main_data %>% filter(treatment == 0))
+
+
+test_pretrends_spec_avg <- feols(avg_forest ~ treat_lead_1 + treat_lead_2
+                             + treat_lead_3 + treat_lead_4 + treat_lead_5 + treat_lead_6|shrid + year_factor,
+                             cluster = ~state_district, main_data %>% filter(treatment == 0))
 
 
 fitstat(test_pretrends_spec,~ f)
@@ -204,12 +226,28 @@ pf(F_stat, df2 = N, df1 = p)
 library(stargazer)
 stargazer(test_pretrends_spec)
 
-etable(test_pretrends_spec, file = "tables/pre_trends_test.tex", 
-       replace = TRUE, title = "Pre-trends")
+table_dict = c(log_total_forest = 'Log of total forest cover', shrid = 'Village',
+               state_dist = 'District', year_factor = "Year",
+               treat_lead_1 = '$\\mathds{1}\\left\\{t = E_{d} +1\\right\\}$',
+               treat_lead_2 = '$\\mathds{1}\\left\\{t = E_{d} +2\\right\\}$',
+               treat_lead_3 = '$\\mathds{1}\\left\\{t = E_{d} +3\\right\\}$',
+               treat_lead_4 = '$\\mathds{1}\\left\\{t = E_{d} +4\\right\\}$',
+               treat_lead_5 = '$\\mathds{1}\\left\\{t = E_{d} +5\\right\\}$',
+               treat_lead_6 = '$\\mathds{1}\\left\\{t = E_{d} +6\\right\\}$'
+               )
+
+
+etable(test_pretrends_spec, test_pretrends_spec_2, test_pretrends_spec_3, file = "tables/pre_trends_test.tex", 
+       replace = TRUE, title = "Pre-trends regressions", label = 'tab:pre-trends_tests', 
+       style.tex = style.tex("base"), dict = table_dict,
+       fixef_sizes = TRUE, notes = c('The standard errors in parentheses are clustered on a district level.'))
+
+
+etable(test_pretrends_spec, test_pretrends_spec_2, title = "Pre-trends")
 
 
 library(broom)
-pre_trends_coef_plot <- tidy(test_pretrends_spec, conf.int = TRUE) %>% 
+pre_trends_coef_plot <- tidy(test_pretrends_spec_2, conf.int = TRUE) %>% 
   mutate(term = str_sub(term, start = -1),
          term = as.numeric(term) * (-1)) %>% 
   ggplot(mapping = aes(x = term, y = estimate, ymin = conf.low, ymax = conf.high, group = 1))+ 
@@ -221,7 +259,7 @@ pre_trends_coef_plot <- tidy(test_pretrends_spec, conf.int = TRUE) %>%
         panel.grid.minor.x = element_blank(), 
         text = element_text(size=14),
         axis.text.x = element_text(angle = 0, hjust = 0.5)) +
-  labs(x = "Lead", 
+  labs(x = "Lead of the dummy for NREGA introduction (number of years)", 
        #caption = "error bars show 95% confidence intervals \n 
        #                      SE are based on the cluster-robust estimator by Pustejovsky and Tipton (2018)", 
        y = "Coefficient") 
