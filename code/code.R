@@ -16,14 +16,13 @@ dist_phases <- read_excel('data/MNREGA_district_phases.xlsx') %>%
   mutate(state_name = str_to_lower(state_name),
          district_name = str_to_lower(district_name))
 
-dist_phases$district_name
 
 
 district_keys <- read_stata('data/shrug-v1.5.samosa-keys-dta/shrug_ec05_district_key.dta') %>% 
   distinct(ec05_state_id, ec05_state_name, ec05_district_id, ec05_district_name)
 
-district_keys_2 <- read_stata('data/shrug-v1.5.samosa-keys-dta/shrug_ec13_district_key.dta') %>% 
-  distinct(ec13_state_id, ec13_state_name, ec13_district_id, ec13_district_name)
+#district_keys_2 <- read_stata('data/shrug-v1.5.samosa-keys-dta/shrug_ec13_district_key.dta') %>% 
+#  distinct(ec13_state_id, ec13_state_name, ec13_district_id, ec13_district_name)
 
 district_keys <- district_keys %>% 
   filter(ec05_district_name != '') %>% 
@@ -108,22 +107,21 @@ main_data  <- main_data %>%
     treat_lag_1 = treatment_dummy_shift(phase, year, 1)
     )
 
-main_data  <- main_data %>% 
+#main_data  <- main_data %>% 
   #group_by(shrid, year) %>% 
-  mutate(treat_lead_1 = dplyr::lead(treatment, 1),
-         ifelse(is.na(treat_lead_1), 1, treat_lead_1),
-         treat_lead_2 = dplyr::lead(treatment, 2),
-         ifelse(is.na(treat_lead_2), 1, treat_lead_2)) %>% 
-  ungroup()
+#  mutate(treat_lead_1 = dplyr::lead(treatment, 1),
+#         ifelse(is.na(treat_lead_1), 1, treat_lead_1),
+#         treat_lead_2 = dplyr::lead(treatment, 2),
+#         ifelse(is.na(treat_lead_2), 1, treat_lead_2)) %>% 
+#  ungroup()
 
 settransform(main_data, treat_long_term_lag_1 = flag(treatment, 1, shrid, year))
 settransform(main_data, treat_long_term_lag_1 = ifelse(is.na(treat_long_term_lag_1), 0, treat_long_term_lag_1))
 
-settransform(main_data, treat_lag_2 = flag(treatment, 2, shrid, year))
+#settransform(main_data, treat_lag_2 = flag(treatment, 2, shrid, year))
 
-settransform(main_data, treat_lead_1 = flag(treatment, -1, shrid, year))
-settransform(main_data, treat_lead_1 = flag(treatment, -1, shrid, year))
-
+#settransform(main_data, treat_lead_1 = flag(treatment, -1, shrid, year))
+#settransform(main_data, treat_lead_1 = flag(treatment, -1, shrid, year))
 
 
 
@@ -133,9 +131,14 @@ basic_spec <- lm_robust(log_total_forest ~ treatment, fixed_effects = ~ year_fac
 
 library(fixest)
 
-basic_spec <- feols(log_total_forest ~ treatment|state_district + year_factor, main_data)
+basic_spec <- feols(log_total_forest ~ treatment|shrid + year_factor, cluster = ~state_district, main_data)
 
-avg_forest_spec <- feols(avg_forest ~ treatment|state_district + year_factor, main_data)
+avg_forest_spec <- feols(avg_forest ~ treatment|shrid + year_factor, cluster = ~state_district, main_data)
+
+basic_spec <- feols(log_total_forest ~ treatment|shrid + year_factor, cluster = ~state_district,
+                    main_data %>% filter(year <= 2008))
+
+
 
 dynamic_spec <- feols(log_total_forest ~ treat_dummy + treat_lead_1 + treat_lead_2
                        + treat_lead_3 + treat_long_term_lag_1|state_district + year_factor, main_data)
@@ -143,11 +146,41 @@ dynamic_spec <- feols(log_total_forest ~ treat_dummy + treat_lead_1 + treat_lead
 
 
 test_pretrends_spec <- feols(log_total_forest ~ treat_lead_1 + treat_lead_2
-                      + treat_lead_3 + treat_lead_4|state_district + year_factor, main_data %>% filter(treatment == 0))
+                      + treat_lead_3 + treat_lead_4 + treat_lead_5|shrid + year_factor,
+                      cluster = ~state_district, main_data %>% filter(treatment == 0))
+
+test_pretrends_spec_2 <- feols(log_total_forest ~ treat_lead_1 + treat_lead_2
+                             + treat_lead_3 + treat_lead_4|shrid + year_factor,
+                             cluster = ~state_district, main_data %>% filter(treatment == 0))
 
 
-fitstat(test_pretrends_spec,
-        ~ f)
+
+fitstat(test_pretrends_spec,~ f)
+fitstat(test_pretrends_spec,~ wf)
+
+df2 = x$nobs - x$nparams
+stat = ((x$ssr_fe_only - x$ssr) / df1) / (x$ssr / df2)
+p = pf(stat, df1, df2, lower.tail = FALSE)
+vec = list(stat = stat, p = p, df1 = df1, df2 = df2)
+res_all[[type]] = set_value(vec, value)
+
+
+
+ssr_unr <- sum(test_pretrends_spec$residuals^2)
+ssr_r <- test_pretrends_spec$ssr_fe_only
+p <- test_pretrends_spec$nparams - sum(test_pretrends_spec$fixef_sizes) + 1
+
+test_pretrends_spec$nparams
+n_clusters <- test_pretrends_spec$fixef_sizes[['state_district']]
+
+sum(test_pretrends_spec$residuals^2)/test_pretrends_spec$ssr_null 
+all_params <- test_pretrends_spec$nparams
+
+
+F_stat <- (N-all_params)/(p) * (ssr_r - ssr_unr)/ssr_unr
+F_stat <- (n_clusters)/(p) * (ssr_r - ssr_unr)/ssr_unr
+
+p_val = pf(F_stat, df1 = p, df2 = n_clusters, lower.tail = FALSE)
 
 
 test_pretrends_spec$ssr_null
@@ -160,7 +193,7 @@ r_sq <- 1- ( sum(test_pretrends_spec$residuals^2))/test_pretrends_spec$ssr_fe_on
 
 N <- test_pretrends_spec$nobs
 N <- 620
-p <- test_pretrends_spec$nparams - sum(test_pretrends_spec$fixef_sizes)
+p <- test_pretrends_spec$nparams - sum(test_pretrends_spec$fixef_sizes) + 1
 
 F_stat <- (N-p)/(p-1) * 1/(1-r_sq)
 
@@ -168,7 +201,31 @@ pf(F_stat, df1 = N, df2 = p)
 pf(F_stat, df2 = N, df1 = p)
 
 
+library(stargazer)
+stargazer(test_pretrends_spec)
 
-# cluster FE by organization
-#event_reg_lenient_summary <- summary(event_reg_lenient, cluster = ~ro_INN)
+etable(test_pretrends_spec, file = "tables/pre_trends_test.tex", 
+       replace = TRUE, title = "Pre-trends")
+
+
+library(broom)
+pre_trends_coef_plot <- tidy(test_pretrends_spec, conf.int = TRUE) %>% 
+  mutate(term = str_sub(term, start = -1),
+         term = as.numeric(term) * (-1)) %>% 
+  ggplot(mapping = aes(x = term, y = estimate, ymin = conf.low, ymax = conf.high, group = 1))+ 
+  #geom_vline(xintercept= 1932.5, col = "red", linetype = "dashed", size = 1)+
+  geom_pointrange()+  geom_hline(yintercept= 0) +
+  theme_minimal() + 
+  theme(axis.line = element_line(size = 1), 
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(), 
+        text = element_text(size=14),
+        axis.text.x = element_text(angle = 0, hjust = 0.5)) +
+  labs(x = "Lead", 
+       #caption = "error bars show 95% confidence intervals \n 
+       #                      SE are based on the cluster-robust estimator by Pustejovsky and Tipton (2018)", 
+       y = "Coefficient") 
+
+pre_trends_coef_plot
+ggsave('figures/pre_trends_coef_plot.pdf')
 
