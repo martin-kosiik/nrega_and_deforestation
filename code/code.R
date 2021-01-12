@@ -109,7 +109,16 @@ main_data  <- main_data %>%
     )
 
 
+median_log_total_forest <- main_data %>% 
+  filter(year == 2000) %>% 
+  summarise(median_log_total_forest = median(log_total_forest)) %>% 
+  pull(median_log_total_forest)
 
+main_data  <- main_data %>% 
+  group_by(shrid) %>% 
+  mutate(log_total_forest_2000 = log_total_forest[[1]]) %>% # the obs. are order by shrid and year
+  ungroup() %>%                                             # so if I take the first element I will take data
+  mutate(high_forest = (log_total_forest_2000 >= median_log_total_forest)*1)                                                        # from the year 2000
 
 #main_data  <- main_data %>% 
   #group_by(shrid, year) %>% 
@@ -140,11 +149,20 @@ basic_spec <- feols(log_total_forest ~ treatment|shrid + year_factor, cluster = 
 village_spec_time_trends <- feols(log_total_forest ~ treatment|shrid + year_factor + shrid[year], cluster = ~state_district, main_data)
 
 
+het_by_baseline_forest <- feols(log_total_forest ~ treatment + log_total_forest_2000:treatment|shrid + year_factor,
+                                cluster = ~state_district, main_data %>% filter(year != 2000))
+
+het_by_high_forest <- feols(log_total_forest ~ treatment + high_forest:treatment|shrid + year_factor,
+                                cluster = ~state_district, main_data %>% filter(year != 2000))
+
+
+
 avg_forest_spec <- feols(avg_forest ~ treatment|shrid + year_factor, cluster = ~state_district, main_data)
 
-main_effect_two_way_clust <- 
+#main_effect_two_way_clust <- 
+mean(main_data$log_total_forest_2000) * (-0.086754)
+median(main_data$log_total_forest_2000) * (-0.086754)
 
-  
   
 basic_spec <- feols(log_total_forest ~ treatment|shrid + year_factor, cluster = ~state_district,
                     main_data %>% filter(year <= 2008))
@@ -175,6 +193,16 @@ test_pretrends_spec <- feols(log_total_forest ~ treat_lead_1 + treat_lead_2
 test_pretrends_spec_avg <- feols(avg_forest ~ treat_lead_1 + treat_lead_2
                              + treat_lead_3 + treat_lead_4 + treat_lead_5 + treat_lead_6|shrid + year_factor,
                              cluster = ~state_district, main_data %>% filter(treatment == 0))
+
+
+
+high_forest_pretrends_formula <- as.formula(str_c('log_total_forest ~', str_c('treat_lead_', 1:5, collapse = '+'),
+                                                  '+', str_c('treat_lead_', 1:5, ':high_forest', collapse = '+'),
+                                                  '|shrid + year_factor'))
+
+test_pretrends_spec_high_forest <- feols(high_forest_pretrends_formula,
+                                         cluster = ~state_district, main_data %>% filter(treatment == 0))
+
 
 
 fitstat(test_pretrends_spec,~ f)
