@@ -1,0 +1,27 @@
+\begin{table}[htbp]
+\centering
+\caption{\label{tab:main-results} Main Results}
+\begin{tabular}{lcccc}
+\tabularnewline\midrule\midrule
+Dependent Variables:&\multicolumn{3}{c}{Log of total forest cover}&Average forest cover (\%)\\
+Model:&(1) & (2) & (3) & (4)\\
+\midrule \emph{Variables}&   &   &   &  \\
+treatment&0.0170 & 0.0009 & 0.0116 & 0.0518\\
+  &(0.0131) & (0.0141) & (0.0122) & (0.1229)\\
+\midrule \emph{Fixed-effects}&   &   &   &  \\
+Village (515,120) & Yes & Yes & Yes & Yes\\
+Year (20) & Yes & Yes &  & Yes\\
+state\_year (680) &  &  & Yes & \\
+\midrule \emph{Varying Slopes}&   &   &   &  \\
+year (Village) &  & Yes &  & \\
+\midrule \emph{Fit statistics}&  & & & \\
+Observations & 10,302,400&10,302,400&10,302,400&10,302,400\\
+R$^2$ & 0.908876&0.92083&0.923461&0.919245\\
+Within R$^2$ & $4.07\times 10^{-5}$&$1.141\times 10^{-7}$&$1.834\times 10^{-5}$&$6.806\times 10^{-6}$\\
+\midrule\midrule\multicolumn{5}{l}{\emph{One-way (state\_district) standard-errors in parentheses}}\\
+\multicolumn{5}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+\end{tabular}
+
+\medskip \emph{Notes:} The standard errors in parentheses are clustered on a district level.
+\end{table}
+

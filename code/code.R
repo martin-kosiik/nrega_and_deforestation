@@ -81,6 +81,7 @@ main_data <- main_data %>%
       TRUE ~ 0),
     year_factor = as.factor(year),
     state_district = str_c(ec05_state_id, ec05_district_id, sep = '-'),
+    state_year =  str_c(ec05_state_id, year, sep = '-'),
     log_total_forest = log(1 + total_forest),
     avg_forest = total_forest/num_cells
     )
@@ -149,6 +150,28 @@ basic_spec <- feols(log_total_forest ~ treatment|shrid + year_factor, cluster = 
 village_spec_time_trends <- feols(log_total_forest ~ treatment|shrid + year_factor + shrid[year], cluster = ~state_district, main_data)
 
 
+village_state_year_fe <- feols(log_total_forest ~ treatment|shrid + state_year, cluster = ~state_district, main_data)
+
+
+avg_forest_spec <- feols(avg_forest ~ treatment|shrid + year_factor, cluster = ~state_district, main_data)
+
+
+
+table_dict = c(log_total_forest = 'Log of total forest cover', shrid = 'Village',
+               state_dist = 'District', year_factor = "Year", 
+               avg_forest = 'Average forest cover (\\%)')
+
+
+
+etable(basic_spec, village_spec_time_trends, village_state_year_fe,avg_forest_spec,
+       file = "tables/main_results.tex", 
+       replace = TRUE, title = "Main Results", label = 'tab:main-results', 
+       style.tex = style.tex("base"), dict = table_dict,
+       fixef_sizes = TRUE, notes = c('The standard errors in parentheses are clustered on a district level.'))
+
+
+
+
 het_by_baseline_forest <- feols(log_total_forest ~ treatment + log_total_forest_2000:treatment|shrid + year_factor,
                                 cluster = ~state_district, main_data %>% filter(year != 2000))
 
@@ -157,7 +180,6 @@ het_by_high_forest <- feols(log_total_forest ~ treatment + high_forest:treatment
 
 
 
-avg_forest_spec <- feols(avg_forest ~ treatment|shrid + year_factor, cluster = ~state_district, main_data)
 
 #main_effect_two_way_clust <- 
 mean(main_data$log_total_forest_2000) * (-0.086754)
