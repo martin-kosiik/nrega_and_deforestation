@@ -158,8 +158,8 @@ avg_forest_spec <- feols(avg_forest ~ treatment|shrid + year_factor, cluster = ~
 
 
 table_dict = c(log_total_forest = 'Log of total forest cover', shrid = 'Village',
-               state_dist = 'District', year_factor = "Year", 
-               avg_forest = 'Average forest cover (\\%)')
+               state_district = 'District', year_factor = "Year", 
+               avg_forest = 'Avg. forest cover (\\%)')
 
 
 
